@@ -11,7 +11,8 @@ x.x.x Release notes (yyyy-MM-dd)
 
 ### Enhancements
 
-* None.
+* Add change notifications for individual objects with an API similar to that
+  of collection notifications.
 
 ### Bugfixes
 
