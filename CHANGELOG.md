@@ -3,10 +3,11 @@ x.x.x Release notes (yyyy-MM-dd)
 
 ### Sync Breaking Changes (In Beta)
 
-* Underlying sync engine upgraded to version BETA-6.5.
+* Underlying sync engine upgraded to version BETA-7.0.
 * Sync-related error reporting behavior has been changed. Errors not related
   to a particular user or session are only reported if they are classed as
   'fatal' by the underlying sync engine.
+* Added `RLMSyncErrorClientResetError` to `RLMSyncError` enum.
 
 ### API Breaking Changes
 
