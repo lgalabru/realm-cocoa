@@ -24,10 +24,49 @@
 
 using namespace realm;
 
+@interface RLMProgressNotificationToken() {
+    uint64_t _token;
+    std::weak_ptr<SyncSession> _session;
+}
+@end
+
+@implementation RLMProgressNotificationToken
+
+- (void)stop {
+    if (auto session = _session.lock()) {
+        session->unregister_progress_notifier(_token);
+        _session = {};
+        _token = 0;
+    }
+}
+
+- (void)dealloc {
+    if (_token != 0) {
+        NSLog(@"RLMProgressNotificationToken released without unregistering a notification. "
+              @"You must hold on to the RLMProgressNotificationToken and call "
+              @"-[RLMProgressNotificationToken stop] when you no longer wish to receive "
+              @"sync progress update notifications.");
+    }
+}
+
+- (nullable instancetype)initWithTokenValue:(uint64_t)token
+                                    session:(std::shared_ptr<SyncSession>)session {
+    if (token == 0) {
+        return nil;
+    }
+    if (self = [super init]) {
+        _token = token;
+        _session = session;
+        return self;
+    }
+    return nil;
+}
+
+@end
+
 @interface RLMSyncSession () {
     std::weak_ptr<SyncSession> _session;
 }
-
 @end
 
 @implementation RLMSyncSession
@@ -105,6 +144,34 @@ using namespace realm;
         return YES;
     }
     return NO;
+}
+
+- (RLMProgressNotificationToken *)addProgressNotificationBlock:(RLMProgressNotificationBlock)block
+                                                     direction:(RLMSyncNotifierDirection)direction
+                                                          mode:(RLMSyncNotifierMode)mode {
+    return [self addProgressNotificationBlock:block direction:direction mode:mode queue:dispatch_get_main_queue()];
+}
+
+- (RLMProgressNotificationToken *)addProgressNotificationBlock:(RLMProgressNotificationBlock)block
+                                                     direction:(RLMSyncNotifierDirection)direction
+                                                          mode:(RLMSyncNotifierMode)mode
+                                                         queue:(dispatch_queue_t)queue {
+    if (auto session = _session.lock()) {
+        if (session->state() == SyncSession::PublicState::Error) {
+            return nil;
+        }
+        auto notifier_direction = (direction == RLMSyncNotifierDirectionUpload
+                                   ? SyncSession::NotifierType::upload
+                                   : SyncSession::NotifierType::download);
+        bool is_streaming = (mode == RLMSyncNotifierModeAlwaysReportLatest);
+        uint64_t token = session->register_progress_notifier([=](uint64_t transferred, uint64_t transferrable) {
+            dispatch_async(queue, ^{
+                block(transferred, transferrable);
+            });
+        }, notifier_direction, is_streaming);
+        return [[RLMProgressNotificationToken alloc] initWithTokenValue:token session:std::move(session)];
+    }
+    return nil;
 }
 
 @end

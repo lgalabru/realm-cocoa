@@ -30,9 +30,54 @@ typedef NS_ENUM(NSUInteger, RLMSyncSessionState) {
     RLMSyncSessionStateInvalid
 };
 
+/**
+ The type of data transfer that a particular sync session notifier block will track.
+ */
+typedef NS_ENUM(NSUInteger, RLMSyncNotifierDirection) {
+    /// For monitoring upload progress.
+    RLMSyncNotifierDirectionUpload,
+    /// For monitoring download progress.
+    RLMSyncNotifierDirectionDownload,
+};
+
+/**
+ The desired behavior of a particular sync session notifier block.
+ */
+typedef NS_ENUM(NSUInteger, RLMSyncNotifierMode) {
+    /// The block will be called forever, or until the user unregisters it.
+    /// It will always report the latest number of transferred bytes, and the
+    /// latest number of total bytes to be transferred.
+    RLMSyncNotifierModeAlwaysReportLatest,
+    /// The block will, upon registration, store the total number of bytes
+    /// to be transferred. When invoked, it will always report the latest number
+    /// of transferred bytes out of that original number of bytes to be
+    /// transferred. When the number of transferred bytes reaches or exceeds the
+    /// number of bytes to be transferred, the block will be unregistered.
+    RLMSyncNotifierModeProgressIndicator,
+};
+
 @class RLMSyncUser, RLMSyncConfiguration;
 
+/**
+ The type of a block intended for reporting a session's network activity to the user.
+
+ `transferred_bytes` refers to the number of bytes that have been uploaded or downloaded.
+
+ `transferrable_bytes` refers to the number of total bytes to be uploaded or downloaded.
+ */
+typedef void(^RLMProgressNotificationBlock)(NSUInteger transferred_bytes, NSUInteger transferrable_bytes);
+
 NS_ASSUME_NONNULL_BEGIN
+
+/**
+ A token object corresponding to a progress notifier block on a `RLMSyncSession`. To stop notifications manually,
+ destroy the token or call `-stop` on it.
+ */
+@interface RLMProgressNotificationToken : NSObject
+
+- (void)stop;
+
+@end
 
 /**
  An object encapsulating a Realm Object Server "session". Sessions represent the communication between the client (and a
@@ -56,6 +101,32 @@ NS_ASSUME_NONNULL_BEGIN
 /// session.
 - (nullable RLMSyncConfiguration *)configuration;
 
-NS_ASSUME_NONNULL_END
+/**
+ Register a progress notification block. Multiple blocks can be registered on the same session at once. All blocks
+ will be dispatched to the main queue.
 
+ The token returned by this method must be retained as long as progress notifications are desired, and the `-stop`
+ method should be called on it when notifications are no longer needed.
+
+ If no token is returned, the session was not in a state where it could accept progress notifiers, or the notifier was
+ not a streaming notifier, was called immediately, and will not be called again since there is no additional progress
+ to report.
+
+ @see: `RLMSyncNotifierDirection`, `RLMSyncNotifierMode`
+ */
+- (nullable RLMProgressNotificationToken *)addProgressNotificationBlock:(RLMProgressNotificationBlock)block
+                                                              direction:(RLMSyncNotifierDirection)direction
+                                                                   mode:(RLMSyncNotifierMode)mode NS_REFINED_FOR_SWIFT;
+
+/**
+ Register a progress notification block, and specify the queue upon which the block should be dispatched.
+
+ @see: `addProgressNotificationBlock:direction:mode:`
+ */
+- (nullable RLMProgressNotificationToken *)addProgressNotificationBlock:(RLMProgressNotificationBlock)block
+                                                              direction:(RLMSyncNotifierDirection)direction
+                                                                   mode:(RLMSyncNotifierMode)mode
+                                                                  queue:(dispatch_queue_t)queue NS_REFINED_FOR_SWIFT;
 @end
+
+NS_ASSUME_NONNULL_END
