@@ -40,6 +40,21 @@
 @implementation SyncObject
 @end
 
+@implementation HugeSyncObject
+
++ (instancetype)object  {
+    const NSInteger fakeDataSize = 1000000;
+    HugeSyncObject *object = [[self alloc] init];
+    char fakeData[fakeDataSize];
+    for (NSInteger i=0; i<fakeDataSize; i++) {
+        fakeData[i] = 16;
+    }
+    object.dataProp = [NSData dataWithBytes:fakeData length:fakeDataSize];
+    return object;
+}
+
+@end
+
 static NSTask *s_task;
 static RLMSyncManager *s_managerForTest;
 

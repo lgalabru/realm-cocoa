@@ -673,6 +673,103 @@
     }
 }
 
+#pragma mark - Progress Notifications
+
+- (void)testStreamingDownloadNotifier {
+    const NSInteger NUMBER_OF_BIG_OBJECTS = 2;
+    NSURL *url = REALM_URL();
+    // Log in the user.
+    RLMSyncUser *user = [self logInUserForCredentials:[RLMObjectServerTests basicCredentialsWithName:ACCOUNT_NAME()
+                                                                                            register:self.isParent]
+                                               server:[RLMObjectServerTests authServerURL]];
+    __block NSInteger callCount = 0;
+    __block NSUInteger transferred = 0;
+    __block NSUInteger transferrable = 0;
+    dispatch_queue_t queue = dispatch_get_global_queue(QOS_CLASS_USER_INTERACTIVE, 0);
+    // Open the Realm
+    RLMRealm *realm = [self openRealmForURL:url user:user];
+    if (self.isParent) {
+        NSLock *lock = [[NSLock alloc] init];
+        // Register a notifier.
+        RLMSyncSession *session = [user sessionForURL:url];
+        XCTAssertNotNil(session);
+        RLMProgressNotificationToken *token = [session addProgressNotificationBlock:^(NSUInteger xfr, NSUInteger xfb) {
+            [lock lockBeforeDate:[NSDate distantFuture]];
+            // Make sure the values are increasing, and update our stored copies.
+            XCTAssert(xfr >= transferred);
+            XCTAssert(xfb >= transferrable);
+            transferred = xfr;
+            transferrable = xfb;
+            callCount++;
+            [lock unlock];
+        } direction:RLMSyncNotifierDirectionDownload mode:RLMSyncNotifierModeAlwaysReportLatest queue:queue];
+        // Wait for the child process to upload everything.
+        RLMRunChildAndWait();
+        WAIT_FOR_DOWNLOAD(user, url);
+        [token stop];
+        // The notifier should have been called at least twice: once at the beginning and at least once
+        // to report progress.
+        [lock lockBeforeDate:[NSDate distantFuture]];
+        XCTAssert(callCount > 1);
+        XCTAssert(transferred >= transferrable);
+        [lock unlock];
+    } else {
+        // Write lots of data to the Realm, then wait for it to be uploaded.
+        [realm beginWriteTransaction];
+        for (NSInteger i=0; i<NUMBER_OF_BIG_OBJECTS; i++) {
+            [realm addObject:[HugeSyncObject object]];
+        }
+        [realm commitWriteTransaction];
+        WAIT_FOR_UPLOAD(user, url);
+        CHECK_COUNT(NUMBER_OF_BIG_OBJECTS, HugeSyncObject, realm);
+    }
+}
+
+- (void)testStreamingUploadNotifier {
+    const NSInteger NUMBER_OF_BIG_OBJECTS = 2;
+    NSURL *url = REALM_URL();
+    // Log in the user.
+    RLMSyncUser *user = [self logInUserForCredentials:[RLMObjectServerTests basicCredentialsWithName:ACCOUNT_NAME()
+                                                                                            register:self.isParent]
+                                               server:[RLMObjectServerTests authServerURL]];
+    __block NSInteger callCount = 0;
+    __block NSUInteger transferred = 0;
+    __block NSUInteger transferrable = 0;
+    dispatch_queue_t queue = dispatch_get_global_queue(QOS_CLASS_USER_INTERACTIVE, 0);
+    // Open the Realm
+    RLMRealm *realm = [self openRealmForURL:url user:user];
+    NSLock *lock = [[NSLock alloc] init];
+    // Register a notifier.
+    RLMSyncSession *session = [user sessionForURL:url];
+    XCTAssertNotNil(session);
+    RLMProgressNotificationToken *token = [session addProgressNotificationBlock:^(NSUInteger xfr, NSUInteger xfb) {
+        [lock lockBeforeDate:[NSDate distantFuture]];
+        // Make sure the values are increasing, and update our stored copies.
+        XCTAssert(xfr >= transferred);
+        XCTAssert(xfb >= transferrable);
+        transferred = xfr;
+        transferrable = xfb;
+        callCount++;
+        [lock unlock];
+    } direction:RLMSyncNotifierDirectionUpload mode:RLMSyncNotifierModeAlwaysReportLatest queue:queue];
+    // Upload lots of data
+    [realm beginWriteTransaction];
+    for (NSInteger i=0; i<NUMBER_OF_BIG_OBJECTS; i++) {
+        [realm addObject:[HugeSyncObject object]];
+    }
+    [realm commitWriteTransaction];
+    // Wait for upload to begin and finish
+    sleep(2);
+    WAIT_FOR_UPLOAD(user, url);
+    [token stop];
+    // The notifier should have been called at least twice: once at the beginning and at least once
+    // to report progress.
+    [lock lockBeforeDate:[NSDate distantFuture]];
+    XCTAssert(callCount > 1);
+    XCTAssert(transferred >= transferrable);
+    [lock unlock];
+}
+
 #pragma mark - Permissions
 
 /// Grant/revoke access a user's Realm to another user. Another user has no access permission by default.

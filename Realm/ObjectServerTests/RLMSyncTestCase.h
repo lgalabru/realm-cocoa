@@ -32,6 +32,11 @@ NS_ASSUME_NONNULL_BEGIN
 @property NSString *stringProp;
 @end
 
+@interface HugeSyncObject : RLMObject
+@property NSData *dataProp;
++ (instancetype)object;
+@end
+
 @interface RLMSyncTestCase : RLMMultiProcessTestCase
 
 + (RLMSyncManager *)managerForCurrentTest;
