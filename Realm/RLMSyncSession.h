@@ -75,6 +75,7 @@ NS_ASSUME_NONNULL_BEGIN
  */
 @interface RLMProgressNotificationToken : NSObject
 
+/// Stop the notifier associated with this token. If the notifier is no longer active, this method does nothing.
 - (void)stop;
 
 @end
