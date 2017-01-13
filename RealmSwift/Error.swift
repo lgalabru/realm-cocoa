@@ -219,14 +219,4 @@ public func == (lhs: ErrorType, rhs: ErrorType) -> Bool { // swiftlint:disable:t
         && lhs._domain == rhs._domain
 }
 
-// MARK: Pattern Matching
-
-/**
- Pattern matching matching for `Realm.Error`, so that the instances can be used with Swift's
- `do { ... } catch { ... }` syntax.
-*/
-public func ~= (lhs: Error, rhs: ErrorType) -> Bool { // swiftlint:disable:this valid_docs
-    return lhs == rhs
-}
-
 #endif
