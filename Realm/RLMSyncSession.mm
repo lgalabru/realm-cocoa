@@ -20,7 +20,6 @@
 
 #import "RLMSyncConfiguration_Private.hpp"
 #import "RLMSyncUser_Private.hpp"
-#import "RLMUtil.hpp"
 #import "sync/sync_session.hpp"
 
 using namespace realm;
@@ -154,11 +153,8 @@ using namespace realm;
         if (session->state() == SyncSession::PublicState::Error) {
             return nil;
         }
-        // Get the current runloop.
+        // Get the current runloop, or create one if necessary.
         CFRunLoopRef currentRunLoop = CFRunLoopGetCurrent();
-        if (!currentRunLoop) {
-            @throw RLMException(@"Progress notifiers can only be added to threads with runloops.");
-        }
         auto notifier_direction = (direction == RLMSyncNotifierDirectionUpload
                                    ? SyncSession::NotifierType::upload
                                    : SyncSession::NotifierType::download);
