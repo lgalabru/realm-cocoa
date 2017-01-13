@@ -173,10 +173,10 @@ class SwiftObjectServerTests: SwiftSyncTestCase {
             let user = try synchronouslyLogInUser(for: basicCredentials(register: isParent), server: authURL)
             let realm = try synchronouslyOpenRealm(url: realmURL, user: user)
             if isParent {
-                user.waitForDownloadToFinish(realmURL)
+                waitForDownloadsForUser(user, url: realmURL)
                 checkCount(expected: 0, realm, SwiftSyncObject.self)
                 executeChild()
-                user.waitForDownloadToFinish(realmURL)
+                waitForDownloadsForUser(user, url: realmURL)
                 checkCount(expected: 3, realm, SwiftSyncObject.self)
             } else {
                 // Add objects
@@ -185,7 +185,7 @@ class SwiftObjectServerTests: SwiftSyncTestCase {
                     realm.add(SwiftSyncObject(value: ["child-2"]))
                     realm.add(SwiftSyncObject(value: ["child-3"]))
                 }
-                user.waitForUploadToFinish(realmURL)
+                waitForUploadsForUser(user, url: realmURL)
                 checkCount(expected: 3, realm, SwiftSyncObject.self)
             }
         } catch {
@@ -204,16 +204,16 @@ class SwiftObjectServerTests: SwiftSyncTestCase {
                     realm.add(SwiftSyncObject(value: ["child-2"]))
                     realm.add(SwiftSyncObject(value: ["child-3"]))
                 }
-                user.waitForUploadToFinish(realmURL)
+                waitForUploadsForUser(user, url: realmURL)
                 checkCount(expected: 3, realm, SwiftSyncObject.self)
                 executeChild()
-                user.waitForDownloadToFinish(realmURL)
+                waitForDownloadsForUser(user, url: realmURL)
                 checkCount(expected: 0, realm, SwiftSyncObject.self)
             } else {
                 try realm.write {
                     realm.deleteAll()
                 }
-                user.waitForUploadToFinish(realmURL)
+                waitForUploadsForUser(user, url: realmURL)
                 checkCount(expected:0, realm, SwiftSyncObject.self)
             }
         } catch {
@@ -252,7 +252,7 @@ class SwiftObjectServerTests: SwiftSyncTestCase {
             for (accessPermissions, statusMessage) in zip(permissions, statusMessages) {
                 for permissions in accessPermissions {
                     let permissionChange = SyncPermissionChange(
-                        realmURL: realmURL.absoluteString,
+                        realmURL: realmURL.absoluteString!,
                         userID: userB.identity!,
                         mayRead: permissions[0],
                         mayWrite: permissions[1],
