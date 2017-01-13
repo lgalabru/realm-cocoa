@@ -104,30 +104,23 @@ NS_ASSUME_NONNULL_BEGIN
 
 /**
  Register a progress notification block. Multiple blocks can be registered on the same session at once. All blocks
- will be dispatched to the main queue.
+ will be run on the same thread that they were registered on. The progress notification block will always be called
+ once immediately upon registration, in order to provide up-to-date information.
 
  The token returned by this method must be retained as long as progress notifications are desired, and the `-stop`
  method should be called on it when notifications are no longer needed.
 
- If no token is returned, the session was not in a state where it could accept progress notifiers, or the notifier was
- not a streaming notifier, was called immediately, and will not be called again since there is no additional progress
- to report.
+ If no token is returned, the notifier will not be ever be called again. There are a number of reasons this might
+ be true. If the session has previously experienced a fatal error it will not accept progress notifiers.
+ If the notifier was configured in the `RLMSyncNotifierModeProgressIndicator` mode but there is no additional
+ progress to report (for example, the number of transferrable bytes and transferred bytes are equal), the notifier
+ will not be called again.
 
  @see: `RLMSyncNotifierDirection`, `RLMSyncNotifierMode`
  */
 - (nullable RLMProgressNotificationToken *)addProgressNotificationBlock:(RLMProgressNotificationBlock)block
                                                               direction:(RLMSyncNotifierDirection)direction
                                                                    mode:(RLMSyncNotifierMode)mode NS_REFINED_FOR_SWIFT;
-
-/**
- Register a progress notification block, and specify the queue upon which the block should be dispatched.
-
- @see: `addProgressNotificationBlock:direction:mode:`
- */
-- (nullable RLMProgressNotificationToken *)addProgressNotificationBlock:(RLMProgressNotificationBlock)block
-                                                              direction:(RLMSyncNotifierDirection)direction
-                                                                   mode:(RLMSyncNotifierMode)mode
-                                                                  queue:(dispatch_queue_t)queue NS_REFINED_FOR_SWIFT;
 @end
 
 NS_ASSUME_NONNULL_END

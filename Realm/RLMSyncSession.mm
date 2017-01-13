@@ -20,6 +20,7 @@
 
 #import "RLMSyncConfiguration_Private.hpp"
 #import "RLMSyncUser_Private.hpp"
+#import "RLMUtil.hpp"
 #import "sync/sync_session.hpp"
 
 using namespace realm;
@@ -149,25 +150,24 @@ using namespace realm;
 - (RLMProgressNotificationToken *)addProgressNotificationBlock:(RLMProgressNotificationBlock)block
                                                      direction:(RLMSyncNotifierDirection)direction
                                                           mode:(RLMSyncNotifierMode)mode {
-    return [self addProgressNotificationBlock:block direction:direction mode:mode queue:dispatch_get_main_queue()];
-}
-
-- (RLMProgressNotificationToken *)addProgressNotificationBlock:(RLMProgressNotificationBlock)block
-                                                     direction:(RLMSyncNotifierDirection)direction
-                                                          mode:(RLMSyncNotifierMode)mode
-                                                         queue:(dispatch_queue_t)queue {
     if (auto session = _session.lock()) {
         if (session->state() == SyncSession::PublicState::Error) {
             return nil;
+        }
+        // Get the current runloop.
+        CFRunLoopRef currentRunLoop = CFRunLoopGetCurrent();
+        if (!currentRunLoop) {
+            @throw RLMException(@"Progress notifiers can only be added to threads with runloops.");
         }
         auto notifier_direction = (direction == RLMSyncNotifierDirectionUpload
                                    ? SyncSession::NotifierType::upload
                                    : SyncSession::NotifierType::download);
         bool is_streaming = (mode == RLMSyncNotifierModeAlwaysReportLatest);
         uint64_t token = session->register_progress_notifier([=](uint64_t transferred, uint64_t transferrable) {
-            dispatch_async(queue, ^{
+            CFRunLoopPerformBlock(currentRunLoop, kCFRunLoopCommonModes, ^{
                 block(transferred, transferrable);
             });
+            CFRunLoopWakeUp(currentRunLoop);
         }, notifier_direction, is_streaming);
         return [[RLMProgressNotificationToken alloc] initWithTokenValue:token session:std::move(session)];
     }

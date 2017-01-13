@@ -342,7 +342,11 @@ public extension SyncSession {
     }
 
     /**
-     A token corresponding to a progress notification block. Hold onto the token as long as you desire notifications.
+     A token corresponding to a progress notification block.
+
+     Call `stop()` on the token to stop notifications. If the notification block has already
+     been automatically stopped, calling `stop()` does nothing. `stop()` should be called
+     before the token is destroyed.
      */
     public typealias NotificationToken = RLMProgressNotificationToken
 
@@ -378,20 +382,24 @@ public extension SyncSession {
     }
 
     /**
-     Register a progress notifier to the session.
+     Register a progress notifier to the session. This progress notifier allows your app to be
+     periodically informed about the number of bytes needing to be, and already downloaded from
+     or uploaded to the sync server. As many concurrent progress notifiers as desired can be
+     registered on a given session.
 
-     If the session is not in a state where a notifier can be registered, this method will return nil.
+     This method will return a token that should be retained until notifications are no longer needed.
+
+     If the session has previously experienced a fatal error, or there is no reason to call the notifier
+     again (for example, if the notifier was configured in `progressRelativeToFixedPoint` mode but the
+     number of transferrable and transferred bytes are already equal), this method will return nil.
      */
     func addProgressNotificationBlock(_ block: @escaping (Progress) -> Void,
                                       direction: NotifierDirection,
-                                      mode: NotifierMode,
-                                      queue: DispatchQueue = DispatchQueue.main) -> SyncSession.NotificationToken? {
+                                      mode: NotifierMode) -> SyncSession.NotificationToken? {
         return __addProgressNotificationBlock({ (transferred, pending) in
-            block(Progress(transferred: transferred,
-                           pending: pending))
+            block(Progress(transferred: transferred, pending: pending))
         }, direction: (direction == .upload ? .upload : .download),
-           mode: (mode == .alwaysReportLatest ? .alwaysReportLatest : .progressIndicator),
-           queue: queue)
+           mode: (mode == .alwaysReportLatest ? .alwaysReportLatest : .progressIndicator))
     }
 }
 
@@ -650,7 +658,11 @@ public extension SyncSession {
     }
 
     /**
-     A token corresponding to a progress notification block. Hold onto the token as long as you desire notifications.
+     A token corresponding to a progress notification block.
+
+     Call `stop()` on the token to stop notifications. If the notification block has already
+     been automatically stopped, calling `stop()` does nothing. `stop()` should be called
+     before the token is destroyed.
      */
     public typealias NotificationToken = RLMProgressNotificationToken
 
@@ -686,20 +698,24 @@ public extension SyncSession {
     }
 
     /**
-     Register a progress notifier to the session.
+     Register a progress notifier to the session. This progress notifier allows your app to be
+     periodically informed about the number of bytes needing to be, and already downloaded from
+     or uploaded to the Realm Object Server. As many concurrent progress notifiers as desired can be
+     registered on a given session.
 
-     If the session is not in a state where a notifier can be registered, this method will return nil.
+     This method will return a token that should be retained until notifications are no longer needed.
+
+     If the session has previously experienced a fatal error, or there is no reason to call the notifier
+     again (for example, if the notifier was configured in `ProgressRelativeToFixedPoint` mode but the
+     number of transferrable and transferred bytes are already equal), this method will return nil.
      */
     func addProgressNotificationBlock(block: (Progress) -> Void,
                                       direction: NotifierDirection,
-                                      mode: NotifierMode,
-                                      queue: dispatch_queue_t = dispatch_get_main_queue()) -> SyncSession.NotificationToken? {
+                                      mode: NotifierMode) -> SyncSession.NotificationToken? {
         return __addProgressNotificationBlock({ (transferred, pending) in
-            block(Progress(transferred: transferred,
-                pending: pending))
+            block(Progress(transferred: transferred, pending: pending))
             }, direction: (direction == .Upload ? .Upload : .Download),
-               mode: (mode == .AlwaysReportLatest ? .AlwaysReportLatest : .ProgressIndicator),
-               queue: queue)
+               mode: (mode == .AlwaysReportLatest ? .AlwaysReportLatest : .ProgressIndicator))
     }
 }
 

@@ -685,34 +685,38 @@
     __block NSInteger callCount = 0;
     __block NSUInteger transferred = 0;
     __block NSUInteger transferrable = 0;
-    dispatch_queue_t queue = dispatch_get_global_queue(QOS_CLASS_USER_INTERACTIVE, 0);
     // Open the Realm
     RLMRealm *realm = [self openRealmForURL:url user:user];
     if (self.isParent) {
-        NSLock *lock = [[NSLock alloc] init];
-        // Register a notifier.
-        RLMSyncSession *session = [user sessionForURL:url];
-        XCTAssertNotNil(session);
-        RLMProgressNotificationToken *token = [session addProgressNotificationBlock:^(NSUInteger xfr, NSUInteger xfb) {
+        XCTestExpectation *ex = [self expectationWithDescription:@"testStreamingDownloadNotifier parent task"];
+        dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INTERACTIVE, 0), ^{
+            NSLock *lock = [[NSLock alloc] init];
+            // Register a notifier.
+            RLMSyncSession *session = [user sessionForURL:url];
+            XCTAssertNotNil(session);
+            RLMProgressNotificationToken *token = [session addProgressNotificationBlock:^(NSUInteger xfr, NSUInteger xfb) {
+                [lock lockBeforeDate:[NSDate distantFuture]];
+                // Make sure the values are increasing, and update our stored copies.
+                XCTAssert(xfr >= transferred);
+                XCTAssert(xfb >= transferrable);
+                transferred = xfr;
+                transferrable = xfb;
+                callCount++;
+                [lock unlock];
+            } direction:RLMSyncNotifierDirectionDownload mode:RLMSyncNotifierModeAlwaysReportLatest];
+            // Wait for the child process to upload everything.
+            RLMRunChildAndWait();
+            WAIT_FOR_DOWNLOAD(user, url);
+            [token stop];
+            // The notifier should have been called at least twice: once at the beginning and at least once
+            // to report progress.
             [lock lockBeforeDate:[NSDate distantFuture]];
-            // Make sure the values are increasing, and update our stored copies.
-            XCTAssert(xfr >= transferred);
-            XCTAssert(xfb >= transferrable);
-            transferred = xfr;
-            transferrable = xfb;
-            callCount++;
+            XCTAssert(callCount > 1);
+            XCTAssert(transferred >= transferrable);
             [lock unlock];
-        } direction:RLMSyncNotifierDirectionDownload mode:RLMSyncNotifierModeAlwaysReportLatest queue:queue];
-        // Wait for the child process to upload everything.
-        RLMRunChildAndWait();
-        WAIT_FOR_DOWNLOAD(user, url);
-        [token stop];
-        // The notifier should have been called at least twice: once at the beginning and at least once
-        // to report progress.
-        [lock lockBeforeDate:[NSDate distantFuture]];
-        XCTAssert(callCount > 1);
-        XCTAssert(transferred >= transferrable);
-        [lock unlock];
+            [ex fulfill];
+        });
+        [self waitForExpectationsWithTimeout:10.0 handler:nil];
     } else {
         // Write lots of data to the Realm, then wait for it to be uploaded.
         [realm beginWriteTransaction];
@@ -735,23 +739,29 @@
     __block NSInteger callCount = 0;
     __block NSUInteger transferred = 0;
     __block NSUInteger transferrable = 0;
-    dispatch_queue_t queue = dispatch_get_global_queue(QOS_CLASS_USER_INTERACTIVE, 0);
     // Open the Realm
     RLMRealm *realm = [self openRealmForURL:url user:user];
     NSLock *lock = [[NSLock alloc] init];
     // Register a notifier.
     RLMSyncSession *session = [user sessionForURL:url];
     XCTAssertNotNil(session);
-    RLMProgressNotificationToken *token = [session addProgressNotificationBlock:^(NSUInteger xfr, NSUInteger xfb) {
-        [lock lockBeforeDate:[NSDate distantFuture]];
-        // Make sure the values are increasing, and update our stored copies.
-        XCTAssert(xfr >= transferred);
-        XCTAssert(xfb >= transferrable);
-        transferred = xfr;
-        transferrable = xfb;
-        callCount++;
-        [lock unlock];
-    } direction:RLMSyncNotifierDirectionUpload mode:RLMSyncNotifierModeAlwaysReportLatest queue:queue];
+    __block RLMProgressNotificationToken *token;
+    XCTestExpectation *ex = [self expectationWithDescription:@"token expectation"];
+    dispatch_async(dispatch_get_main_queue(), ^{
+        token = [session addProgressNotificationBlock:^(NSUInteger xfr, NSUInteger xfb) {
+            [lock lockBeforeDate:[NSDate distantFuture]];
+            // Make sure the values are increasing, and update our stored copies.
+            XCTAssert(xfr >= transferred);
+            XCTAssert(xfb >= transferrable);
+            transferred = xfr;
+            transferrable = xfb;
+            callCount++;
+            [lock unlock];
+        } direction:RLMSyncNotifierDirectionUpload mode:RLMSyncNotifierModeAlwaysReportLatest];
+        CFRunLoopRun();
+        [ex fulfill];
+    });
+    [self waitForExpectationsWithTimeout:5.0 handler:nil];
     // Upload lots of data
     [realm beginWriteTransaction];
     for (NSInteger i=0; i<NUMBER_OF_BIG_OBJECTS; i++) {
@@ -759,7 +769,7 @@
     }
     [realm commitWriteTransaction];
     // Wait for upload to begin and finish
-    sleep(2);
+    usleep(500000);
     WAIT_FOR_UPLOAD(user, url);
     [token stop];
     // The notifier should have been called at least twice: once at the beginning and at least once

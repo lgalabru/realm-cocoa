@@ -45,11 +45,10 @@
 + (instancetype)object  {
     const NSInteger fakeDataSize = 1000000;
     HugeSyncObject *object = [[self alloc] init];
-    char fakeData[fakeDataSize];
-    for (NSInteger i=0; i<fakeDataSize; i++) {
-        fakeData[i] = 16;
-    }
-    object.dataProp = [NSData dataWithBytes:fakeData length:fakeDataSize];
+    char *fakeData = malloc(fakeDataSize);
+    memset(fakeData, sizeof(fakeData), 16);
+    object.dataProp = [NSData dataWithBytes:fakeData length:sizeof(fakeData)];
+    free(fakeData);
     return object;
 }
 
