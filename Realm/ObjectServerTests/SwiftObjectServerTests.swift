@@ -39,10 +39,10 @@ class SwiftObjectServerTests: SwiftSyncTestCase {
             let user = try synchronouslyLogInUser(for: basicCredentials(register: isParent), server: authURL)
             let realm = try synchronouslyOpenRealm(url: realmURL, user: user)
             if isParent {
-                user.waitForDownload(toFinish: realmURL)
+                waitForDownloads(for: user, url: realmURL)
                 checkCount(expected: 0, realm, SwiftSyncObject.self)
                 executeChild()
-                user.waitForDownload(toFinish: realmURL)
+                waitForDownloads(for: user, url: realmURL)
                 checkCount(expected: 3, realm, SwiftSyncObject.self)
             } else {
                 // Add objects
@@ -51,7 +51,7 @@ class SwiftObjectServerTests: SwiftSyncTestCase {
                     realm.add(SwiftSyncObject(value: ["child-2"]))
                     realm.add(SwiftSyncObject(value: ["child-3"]))
                 }
-                user.waitForUpload(toFinish: realmURL)
+                waitForUploads(for: user, url: realmURL)
                 checkCount(expected: 3, realm, SwiftSyncObject.self)
             }
         } catch {
@@ -70,16 +70,16 @@ class SwiftObjectServerTests: SwiftSyncTestCase {
                     realm.add(SwiftSyncObject(value: ["child-2"]))
                     realm.add(SwiftSyncObject(value: ["child-3"]))
                 }
-                user.waitForUpload(toFinish: realmURL)
+                waitForUploads(for: user, url: realmURL)
                 checkCount(expected: 3, realm, SwiftSyncObject.self)
                 executeChild()
-                user.waitForDownload(toFinish: realmURL)
+                waitForDownloads(for: user, url: realmURL)
                 checkCount(expected: 0, realm, SwiftSyncObject.self)
             } else {
                 try realm.write {
                     realm.deleteAll()
                 }
-                user.waitForUpload(toFinish: realmURL)
+                waitForUploads(for: user, url: realmURL)
                 checkCount(expected:0, realm, SwiftSyncObject.self)
             }
         } catch {
